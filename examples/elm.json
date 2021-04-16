@@ -28,7 +28,7 @@
             "mdgriffith/elm-ui": "1.1.8",
             "ohanhi/keyboard": "2.0.1",
             "w0rm/elm-obj-file": "1.0.0",
-            "w0rm/elm-physics": "5.1.1"
+            "w0rm/elm-physics": "5.1.3"
         },
         "indirect": {
             "elm/bytes": "1.0.8",
