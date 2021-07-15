@@ -41,7 +41,7 @@ type WorldCoordinates
 gold : Material.Uniform WorldCoordinates
 gold =
     Material.metal
-        { baseColor = Color.rgb255 255 195 86
+        { baseColor = Color.rgba (255 / 255) (195 / 255) (86 / 255) 0.5
         , roughness = 0.4
         }
 

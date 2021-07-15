@@ -19,6 +19,7 @@ module Scene3d.ColorConversions exposing
 
 import Color exposing (Color)
 import Math.Vector3 as Vector3 exposing (vec3)
+import Math.Vector4 as Vector4 exposing (vec4)
 import Quantity exposing (Quantity(..), Unitless)
 import Scene3d.Types as Types exposing (Chromaticity(..), CieXyz(..), LinearRgb(..))
 
@@ -26,22 +27,24 @@ import Scene3d.Types as Types exposing (Chromaticity(..), CieXyz(..), LinearRgb(
 colorToLinearRgb : Color -> LinearRgb Unitless
 colorToLinearRgb color =
     let
-        { red, green, blue } =
+        { red, green, blue, alpha } =
             Color.toRgba color
     in
     LinearRgb <|
-        vec3
+        vec4
             (inverseGamma red)
             (inverseGamma green)
             (inverseGamma blue)
+            alpha
 
 
 linearRgbToColor : LinearRgb Unitless -> Color
 linearRgbToColor (LinearRgb linearRgb) =
-    Color.rgb
-        (gammaCorrect (Vector3.getX linearRgb))
-        (gammaCorrect (Vector3.getY linearRgb))
-        (gammaCorrect (Vector3.getZ linearRgb))
+    Color.rgba
+        (gammaCorrect (Vector4.getX linearRgb))
+        (gammaCorrect (Vector4.getY linearRgb))
+        (gammaCorrect (Vector4.getZ linearRgb))
+        (Vector4.getW linearRgb)
 
 
 colorToCieXyz : Color -> CieXyz Unitless
@@ -55,30 +58,32 @@ cieXyzToColor xyz =
 
 
 cieXyzToLinearRgb : CieXyz units -> LinearRgb units
-cieXyzToLinearRgb (CieXyz bigX bigY bigZ) =
+cieXyzToLinearRgb (CieXyz bigX bigY bigZ a) =
     LinearRgb <|
-        vec3
+        vec4
             (3.2406 * bigX - 1.5372 * bigY - 0.4986 * bigZ)
             (-0.9689 * bigX + 1.8758 * bigY + 0.0415 * bigZ)
             (0.0557 * bigX - 0.204 * bigY + 1.057 * bigZ)
+            a
 
 
 linearRgbToCieXyz : LinearRgb units -> CieXyz units
 linearRgbToCieXyz (LinearRgb linearRgb) =
     let
         linearR =
-            Vector3.getX linearRgb
+            Vector4.getX linearRgb
 
         linearG =
-            Vector3.getY linearRgb
+            Vector4.getY linearRgb
 
         linearB =
-            Vector3.getZ linearRgb
+            Vector4.getZ linearRgb
     in
     CieXyz
         (0.4124 * linearR + 0.3576 * linearG + 0.1805 * linearB)
         (0.2126 * linearR + 0.7152 * linearG + 0.0722 * linearB)
         (0.0193 * linearR + 0.1192 * linearG + 0.9505 * linearB)
+        (Vector4.getW linearRgb)
 
 
 gammaCorrect : Float -> Float
@@ -103,7 +108,7 @@ inverseGamma u =
 
 chromaticityToCieXyz : Quantity Float units -> Chromaticity -> CieXyz units
 chromaticityToCieXyz (Quantity intensity) (Types.Chromaticity { x, y }) =
-    CieXyz (intensity * x / y) intensity (intensity * (1 - x - y) / y)
+    CieXyz (intensity * x / y) intensity (intensity * (1 - x - y) / y) 1
 
 
 chromaticityToLinearRgb : Quantity Float units -> Chromaticity -> LinearRgb units

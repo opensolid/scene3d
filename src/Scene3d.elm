@@ -962,7 +962,8 @@ type alias RenderPass lights =
 
 
 type alias RenderPasses =
-    { meshes : List (RenderPass ( LightMatrices, Vec4 ))
+    { opaqueMeshes : List (RenderPass ( LightMatrices, Vec4 ))
+    , transparentMeshes : List (RenderPass ( LightMatrices, Vec4 ))
     , shadows : List (RenderPass Mat4)
     , points : List (RenderPass ( LightMatrices, Vec4 ))
     }
@@ -1009,7 +1010,7 @@ collectRenderPasses sceneProperties viewMatrix projectionMatrix currentTransform
                 childNode
                 accumulated
 
-        MeshNode _ meshDrawFunction ->
+        OpaqueMeshNode _ meshDrawFunction ->
             let
                 updatedMeshes =
                     createRenderPass
@@ -1018,9 +1019,27 @@ collectRenderPasses sceneProperties viewMatrix projectionMatrix currentTransform
                         projectionMatrix
                         currentTransformation
                         meshDrawFunction
-                        :: accumulated.meshes
+                        :: accumulated.opaqueMeshes
             in
-            { meshes = updatedMeshes
+            { opaqueMeshes = updatedMeshes
+            , transparentMeshes = accumulated.transparentMeshes
+            , shadows = accumulated.shadows
+            , points = accumulated.points
+            }
+
+        TransparentMeshNode _ meshDrawFunction ->
+            let
+                updatedMeshes =
+                    createRenderPass
+                        sceneProperties
+                        viewMatrix
+                        projectionMatrix
+                        currentTransformation
+                        meshDrawFunction
+                        :: accumulated.transparentMeshes
+            in
+            { opaqueMeshes = accumulated.opaqueMeshes
+            , transparentMeshes = updatedMeshes
             , shadows = accumulated.shadows
             , points = accumulated.points
             }
@@ -1036,7 +1055,8 @@ collectRenderPasses sceneProperties viewMatrix projectionMatrix currentTransform
                         pointDrawFunction
                         :: accumulated.points
             in
-            { meshes = accumulated.meshes
+            { opaqueMeshes = accumulated.opaqueMeshes
+            , transparentMeshes = accumulated.transparentMeshes
             , shadows = accumulated.shadows
             , points = updatedPoints
             }
@@ -1052,7 +1072,8 @@ collectRenderPasses sceneProperties viewMatrix projectionMatrix currentTransform
                         shadowDrawFunction
                         :: accumulated.shadows
             in
-            { meshes = accumulated.meshes
+            { opaqueMeshes = accumulated.opaqueMeshes
+            , transparentMeshes = accumulated.transparentMeshes
             , shadows = updatedShadows
             , points = accumulated.points
             }
@@ -1071,19 +1092,22 @@ collectRenderPasses sceneProperties viewMatrix projectionMatrix currentTransform
 
 defaultBlend : WebGL.Settings.Setting
 defaultBlend =
-    Blend.custom
-        { r = 0
-        , g = 0
-        , b = 0
-        , a = 0
-        , color = Blend.customAdd Blend.srcAlpha Blend.oneMinusSrcAlpha
-        , alpha = Blend.customAdd Blend.one Blend.oneMinusSrcAlpha
-        }
+    Blend.add Blend.one Blend.oneMinusSrcAlpha
 
 
 depthTestDefault : List WebGL.Settings.Setting
 depthTestDefault =
     [ DepthTest.default, defaultBlend ]
+
+
+writeDepth : List WebGL.Settings.Setting
+writeDepth =
+    [ DepthTest.default, defaultBlend, WebGL.Settings.colorMask False False False False ]
+
+
+depthTestEqual : List WebGL.Settings.Setting
+depthTestEqual =
+    [ DepthTest.equal { write = True, near = 0, far = 1 }, defaultBlend ]
 
 
 outsideStencil : List WebGL.Settings.Setting
@@ -1198,7 +1222,14 @@ getViewBounds viewFrame scale current nodes =
                 Types.EmptyNode ->
                     getViewBounds viewFrame scale current rest
 
-                Types.MeshNode modelBounds _ ->
+                Types.OpaqueMeshNode modelBounds _ ->
+                    let
+                        updated =
+                            updateViewBounds viewFrame scale modelBounds current
+                    in
+                    getViewBounds viewFrame scale updated rest
+
+                Types.TransparentMeshNode modelBounds _ ->
                     let
                         updated =
                             updateViewBounds viewFrame scale modelBounds current
@@ -1515,9 +1546,9 @@ toWebGLEntities arguments =
                         , m22 = eyePointOrDirectionToCamera.y
                         , m32 = eyePointOrDirectionToCamera.z
                         , m42 = projectionType
-                        , m13 = Math.Vector3.getX referenceWhite
-                        , m23 = Math.Vector3.getY referenceWhite
-                        , m33 = Math.Vector3.getZ referenceWhite
+                        , m13 = Math.Vector4.getX referenceWhite
+                        , m23 = Math.Vector4.getY referenceWhite
+                        , m33 = Math.Vector4.getZ referenceWhite
                         , m43 = 0
                         , m14 = arguments.supersampling
                         , m24 = Length.inMeters sceneDiameter
@@ -1535,7 +1566,8 @@ toWebGLEntities arguments =
                         projectionMatrix
                         Transformation.identity
                         rootNode
-                        { meshes = []
+                        { opaqueMeshes = []
+                        , transparentMeshes = []
                         , shadows = []
                         , points = []
                         }
@@ -1543,26 +1575,38 @@ toWebGLEntities arguments =
             case arguments.lights of
                 SingleUnshadowedPass lightMatrices ->
                     List.concat
-                        [ call renderPasses.meshes ( lightMatrices, allLightsEnabled ) depthTestDefault
+                        [ call renderPasses.opaqueMeshes ( lightMatrices, allLightsEnabled ) depthTestDefault
+                        , call renderPasses.transparentMeshes ( lightMatrices, allLightsEnabled ) (Entity.cullFrontFaceSetting :: writeDepth)
+                        , call renderPasses.transparentMeshes ( lightMatrices, allLightsEnabled ) (Entity.cullFrontFaceSetting :: depthTestEqual)
+                        , call renderPasses.transparentMeshes ( lightMatrices, allLightsEnabled ) (Entity.cullBackFaceSetting :: writeDepth)
+                        , call renderPasses.transparentMeshes ( lightMatrices, allLightsEnabled ) (Entity.cullBackFaceSetting :: depthTestEqual)
                         , call renderPasses.points lightingDisabled depthTestDefault
                         ]
 
                 SingleShadowedPass lightMatrices ->
                     List.concat
-                        [ call renderPasses.meshes lightingDisabled depthTestDefault
+                        [ call renderPasses.opaqueMeshes lightingDisabled depthTestDefault
                         , [ initStencil ]
                         , call renderPasses.shadows lightMatrices.lights12 createShadowStencil
                         , [ storeStencilValue 0 ]
-                        , call renderPasses.meshes ( lightMatrices, allLightsEnabled ) outsideStencil
+                        , call renderPasses.opaqueMeshes ( lightMatrices, allLightsEnabled ) outsideStencil
+                        , call renderPasses.transparentMeshes ( lightMatrices, allLightsEnabled ) (Entity.cullFrontFaceSetting :: writeDepth)
+                        , call renderPasses.transparentMeshes ( lightMatrices, allLightsEnabled ) (Entity.cullFrontFaceSetting :: depthTestEqual)
+                        , call renderPasses.transparentMeshes ( lightMatrices, allLightsEnabled ) (Entity.cullBackFaceSetting :: writeDepth)
+                        , call renderPasses.transparentMeshes ( lightMatrices, allLightsEnabled ) (Entity.cullBackFaceSetting :: depthTestEqual)
                         , call renderPasses.points lightingDisabled depthTestDefault
                         ]
 
                 MultiplePasses shadowCasters allLightMatrices ->
                     List.concat
-                        [ call renderPasses.meshes ( allLightMatrices, allLightsEnabled ) depthTestDefault
+                        [ call renderPasses.opaqueMeshes ( allLightMatrices, allLightsEnabled ) depthTestDefault
                         , [ initStencil ]
                         , createShadows renderPasses.shadows shadowCasters
-                        , renderWithinShadows renderPasses.meshes allLightMatrices (List.length shadowCasters)
+                        , renderWithinShadows renderPasses.opaqueMeshes allLightMatrices (List.length shadowCasters)
+                        , call renderPasses.transparentMeshes ( allLightMatrices, allLightsEnabled ) (Entity.cullFrontFaceSetting :: writeDepth)
+                        , call renderPasses.transparentMeshes ( allLightMatrices, allLightsEnabled ) (Entity.cullFrontFaceSetting :: depthTestEqual)
+                        , call renderPasses.transparentMeshes ( allLightMatrices, allLightsEnabled ) (Entity.cullBackFaceSetting :: writeDepth)
+                        , call renderPasses.transparentMeshes ( allLightMatrices, allLightsEnabled ) (Entity.cullBackFaceSetting :: depthTestEqual)
                         , call renderPasses.points lightingDisabled depthTestDefault
                         ]
 

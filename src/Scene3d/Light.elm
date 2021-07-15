@@ -29,6 +29,7 @@ import Illuminance exposing (Illuminance)
 import Length exposing (Meters)
 import LuminousFlux exposing (LuminousFlux)
 import Math.Vector3 exposing (Vec3)
+import Math.Vector4
 import Point3d exposing (Point3d)
 import Quantity
 import Scene3d.ColorConversions as ColorConversions
@@ -161,9 +162,9 @@ directional (CastsShadows shadowFlag) light =
         , x = -x
         , y = -y
         , z = -z
-        , r = Math.Vector3.getX rgb
-        , g = Math.Vector3.getY rgb
-        , b = Math.Vector3.getZ rgb
+        , r = Math.Vector4.getX rgb
+        , g = Math.Vector4.getY rgb
+        , b = Math.Vector4.getZ rgb
         , parameter = 0
         }
 
@@ -210,9 +211,9 @@ point (CastsShadows shadowFlag) light =
         , x = x
         , y = y
         , z = z
-        , r = Math.Vector3.getX rgb
-        , g = Math.Vector3.getY rgb
-        , b = Math.Vector3.getZ rgb
+        , r = Math.Vector4.getX rgb
+        , g = Math.Vector4.getY rgb
+        , b = Math.Vector4.getZ rgb
         , parameter = 0
         }
 
@@ -289,9 +290,9 @@ soft light =
             , x = x
             , y = y
             , z = z
-            , r = nitsAbove * Math.Vector3.getX rgb
-            , g = nitsAbove * Math.Vector3.getY rgb
-            , b = nitsAbove * Math.Vector3.getZ rgb
+            , r = nitsAbove * Math.Vector4.getX rgb
+            , g = nitsAbove * Math.Vector4.getY rgb
+            , b = nitsAbove * Math.Vector4.getZ rgb
             , parameter = nitsBelow / nitsAbove
             }
 
@@ -491,7 +492,7 @@ sRGB color space).
 color : Color -> Chromaticity
 color givenColor =
     let
-        (Types.CieXyz bigX bigY bigZ) =
+        (Types.CieXyz bigX bigY bigZ _) =
             ColorConversions.colorToCieXyz givenColor
 
         sum =

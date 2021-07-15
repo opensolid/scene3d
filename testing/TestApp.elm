@@ -87,6 +87,11 @@ type Material
     | TexturedPbr
 
 
+type Transparency
+    = Transparent
+    | Opaque
+
+
 type Transformation
     = NoTransformation
     | Translation
@@ -116,6 +121,7 @@ type Projection
 type alias TestCase =
     { mesh : Mesh
     , material : Material
+    , transparency : Transparency
     , shadows : Bool
     , transformation : Transformation
     , pointLight : Bool
@@ -335,6 +341,19 @@ parseMaterial string =
             Err ("Unrecognized material type '" ++ string ++ "'")
 
 
+parseTransparency : String -> Result String Transparency
+parseTransparency string =
+    case string of
+        "Transparent" ->
+            Ok Transparent
+
+        "Opaque" ->
+            Ok Opaque
+
+        _ ->
+            Err ("Unrecognized transparency type '" ++ string ++ "'")
+
+
 parseShadows : String -> Result String Bool
 parseShadows string =
     case string of
@@ -464,10 +483,11 @@ parseTestCase line =
             String.split "\t" line
     in
     case items of
-        [ meshString, materialString, shadowString, transformationString, pointLightString, directionalLightString, softLightingString, toneMappingString, antialiasingString, projectionString ] ->
+        [ meshString, materialString, transparencyString, shadowString, transformationString, pointLightString, directionalLightString, softLightingString, toneMappingString, antialiasingString, projectionString ] ->
             Ok TestCase
                 |> Result.Extra.andMap (parseMesh meshString)
                 |> Result.Extra.andMap (parseMaterial materialString)
+                |> Result.Extra.andMap (parseTransparency transparencyString)
                 |> Result.Extra.andMap (parseShadows shadowString)
                 |> Result.Extra.andMap (parseTransformation transformationString)
                 |> Result.Extra.andMap (parsePointLight pointLightString)
@@ -478,7 +498,7 @@ parseTestCase line =
                 |> Result.Extra.andMap (parseProjection projectionString)
 
         _ ->
-            Err ("Expected 10 items in line, got '" ++ line ++ "' with " ++ String.fromInt (List.length items))
+            Err ("Expected 11 items in line, got '" ++ line ++ "' with " ++ String.fromInt (List.length items))
 
 
 parseTestCases : String -> Result String (List TestCase)
@@ -1420,11 +1440,31 @@ view model =
 
 entity : LoadedModel -> TestCase -> Maybe (Entity WorldCoordinates)
 entity model testCase =
+    let
+        withTransparency : Color -> Color
+        withTransparency baseColor =
+            let
+                { red, green, blue } =
+                    Color.toRgba baseColor
+            in
+            Color.fromRgba
+                { red = red
+                , green = green
+                , blue = blue
+                , alpha =
+                    case testCase.transparency of
+                        Transparent ->
+                            0.5
+
+                        Opaque ->
+                            1.0
+                }
+    in
     case testCase.material of
         Color ->
             let
                 material =
-                    Material.color Color.blue
+                    Material.color (withTransparency Color.blue)
             in
             case testCase.mesh of
                 Points ->
@@ -1544,7 +1584,7 @@ entity model testCase =
         Matte ->
             let
                 material =
-                    Material.matte Color.blue
+                    Material.matte (withTransparency Color.blue)
             in
             case testCase.mesh of
                 Points ->
@@ -1605,7 +1645,7 @@ entity model testCase =
             let
                 material =
                     Material.nonmetal
-                        { baseColor = Color.blue
+                        { baseColor = withTransparency Color.blue
                         , roughness = 0.25
                         }
             in
@@ -2134,6 +2174,16 @@ meshDescription mesh =
             "Point"
 
 
+transparencyDescription : Transparency -> String
+transparencyDescription transparency =
+    case transparency of
+        Transparent ->
+            "Transparent"
+
+        Opaque ->
+            "Opaque"
+
+
 materialDescription : Material -> String
 materialDescription material =
     case material of
@@ -2263,6 +2313,7 @@ viewTestCaseProperties testCaseIndex numTestCases testCase =
             [ ( "Test case:", String.fromInt (testCaseIndex + 1) ++ " of " ++ String.fromInt numTestCases, Nothing )
             , ( "Mesh:", meshDescription testCase.mesh, Nothing )
             , ( "Material:", materialDescription testCase.material, Nothing )
+            , ( "Transparency:", transparencyDescription testCase.transparency, Nothing )
             , ( "Shadows:", shadowsDescription testCase.shadows, Just ToggleShadow )
             , ( "Transformation:", transformationDescription testCase.transformation, Just ToggleTransformation )
             , ( "Point light:", pointLightDescription testCase.pointLight, Just TogglePointLight )

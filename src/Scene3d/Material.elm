@@ -104,7 +104,7 @@ this textured mesh".
 
 import Color exposing (Color)
 import Luminance exposing (Luminance)
-import Math.Vector3 exposing (Vec3)
+import Math.Vector4 exposing (Vec4)
 import Quantity
 import Scene3d.ColorConversions as ColorConversions
 import Scene3d.Types as Types exposing (Chromaticity, LinearRgb(..), NormalMapFormat)
@@ -143,7 +143,7 @@ given color will be ignored.
 -}
 color : Color -> Material coordinates attributes
 color givenColor =
-    Types.UnlitMaterial Types.UseMeshUvs (Types.Constant (toVec3 givenColor))
+    Types.UnlitMaterial Types.UseMeshUvs (Types.Constant (toVec4 givenColor))
 
 
 {-| A perfectly matte ([Lambertian](https://en.wikipedia.org/wiki/Lambertian_reflectance))
@@ -436,13 +436,13 @@ map function texture =
             Types.Texture properties
 
 
-toVec3 : Color -> Vec3
-toVec3 givenColor =
+toVec4 : Color -> Vec4
+toVec4 givenColor =
     let
-        { red, green, blue } =
+        { red, green, blue, alpha } =
             Color.toRgba givenColor
     in
-    Math.Vector3.vec3 red green blue
+    Math.Vector4.vec4 red green blue alpha
 
 
 {-| A textured plain-color material, unaffected by lighting.
@@ -452,7 +452,7 @@ toVec3 givenColor =
 -}
 texturedColor : Texture Color -> Material coordinates { a | uvs : () }
 texturedColor colorTexture =
-    Types.UnlitMaterial Types.UseMeshUvs (map toVec3 colorTexture)
+    Types.UnlitMaterial Types.UseMeshUvs (map toVec4 colorTexture)
 
 
 {-| A textured matte material.

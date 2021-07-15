@@ -84,7 +84,7 @@ type alias VertexWithTangent =
 
 
 type Material coordinates attributes
-    = UnlitMaterial TextureMap (Texture Vec3)
+    = UnlitMaterial TextureMap (Texture Vec4)
     | EmissiveMaterial TextureMap (Texture (LinearRgb Unitless)) Luminance
     | LambertianMaterial TextureMap (Texture (LinearRgb Unitless)) (Texture Float) NormalMap
     | PbrMaterial TextureMap (Texture (LinearRgb Unitless)) (Texture Float) (Texture Float) (Texture Float) NormalMap
@@ -111,6 +111,7 @@ type Texture value
         { url : String
         , options : WebGL.Texture.Options
         , data : WebGL.Texture.Texture
+        -- TODO: transparency here
         }
 
 
@@ -168,7 +169,8 @@ type alias DrawFunction lights =
 
 type Node
     = EmptyNode
-    | MeshNode Bounds (DrawFunction ( LightMatrices, Vec4 ))
+    | OpaqueMeshNode Bounds (DrawFunction ( LightMatrices, Vec4 ))
+    | TransparentMeshNode Bounds (DrawFunction ( LightMatrices, Vec4 ))
     | ShadowNode (DrawFunction Mat4)
     | PointNode Bounds (DrawFunction ( LightMatrices, Vec4 ))
     | Group (List Node)
@@ -184,11 +186,11 @@ type Chromaticity
 
 
 type CieXyz units
-    = CieXyz Float Float Float
+    = CieXyz Float Float Float Float
 
 
 type LinearRgb units
-    = LinearRgb Vec3
+    = LinearRgb Vec4
 
 
 type Light coordinates castsShadows

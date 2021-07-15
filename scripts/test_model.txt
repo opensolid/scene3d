@@ -1,5 +1,6 @@
 Mesh: Points, LineSegments, Polyline, Triangles, Facets, Plain, Uniform, Unlit, Textured, TexturedFacets, Quad, Block, Sphere, Cylinder, Cone, Facet, LineSegment, Point
 Material: Color, Emissive, Matte, Pbr, TexturedColor, TexturedEmissive, TexturedMatte, TexturedPbr
+Transparency: Opaque, Transparent
 Shadows: NoShadows, Shadows
 Transformation: NoTransformation, Translation, Rotation, Scale, Mirror
 PointLight: PointLight, NoPointLight
@@ -13,6 +14,7 @@ Projection: Perspective, Orthographic
 IF [Mesh] IN {"Points", "LineSegments", "Polyline", "Triangles", "Plain", "LineSegment", "Point"} THEN [Material] IN {"Color", "Emissive"};
 IF [Mesh] IN {"Facets", "Uniform", "Block", "Cylinder", "Cone", "Facet"} THEN [Material] IN {"Color", "Emissive", "Matte", "Pbr"};
 IF [Mesh] IN {"Unlit"} THEN [Material] IN {"Color", "Emissive", "TexturedColor", "TexturedEmissive"};
+IF [Transparency] IN {"Transparent"} THEN [Material] IN {"Color", "Matte", "Pbr"};
 
 # Don't bother testing shadows without shadow-casting lighting
 IF [Shadows] = "Shadows" THEN [PointLight] = "PointLight" OR [DirectionalLight] = "DirectionalLight";
